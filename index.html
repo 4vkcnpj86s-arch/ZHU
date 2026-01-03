@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手搖成癮患者 🥤 2026 互動日曆 (紫色版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Chart.js 用於繪製圓餅圖 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+
+        :root {
+            /* 低飽和度紫色系色票 */
+            --lavender-bg: #f2f0f5; 
+            --lavender-primary: #9b8ea9; 
+            --lavender-secondary: #dcd6e0; 
+            --lavender-accent: #8675a9; 
+            --lavender-text: #5a5464;
+            --lavender-card: #ffffff;
+            --lavender-grid-line: #e9e4ed;
+            --stat-value-color: #726a83;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--lavender-bg);
+            color: var(--lavender-text);
+            margin: 0;
+            padding: env(safe-area-inset-top) 12px 40px;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+        /* 月份切換按鈕 */
+        .month-btn {
+            flex-shrink: 0;
+            padding: 8px 16px;
+            border-radius: 10px;
+            background: white;
+            border: 1px solid var(--lavender-secondary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+            color: #b1abb9;
+        }
+
+        .month-btn.active {
+            background: var(--lavender-accent);
+            color: white;
+            border-color: var(--lavender-accent);
+        }
+
+        /* 日曆網格 */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px; 
+            background: transparent; 
+            padding: 4px;
+        }
+
+        .weekday-label {
+            text-align: center;
+            font-weight: 700;
+            color: #b9b2c3;
+            padding: 8px 0;
+            font-size: 11px;
+            letter-spacing: 0.05em;
+        }
+
+        .day-cell {
+            background: #ffffff;
+            border-radius: 10px;
+            aspect-ratio: 1 / 1.35; 
+            padding: 4px;
+            border: 1px solid var(--lavender-grid-line);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(155, 142, 169, 0.05);
+        }
+
+        .day-cell.is-today {
+            border: 2px solid var(--lavender-primary);
+            background: #f9f7fb;
+        }
+
+        .day-cell:hover {
+            border-color: var(--lavender-accent);
+            background: #fdfcff;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(134, 117, 169, 0.1);
+            z-index: 5;
+        }
+
+        .day-num {
+            font-weight: 700;
+            font-size: 10px;
+            color: #cdc7d4;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+
+        .day-cell.has-data .day-num {
+            color: var(--lavender-accent);
+        }
+
+        .drink-icons-container {
+            flex-grow: 1;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: center;
+            justify-content: center;
+            gap: 1px;
+            width: 100%;
+            overflow: hidden;
+            padding-bottom: 2px;
+        }
+
+        .cup-svg-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        
+        .cup-size-1 svg { width: 24px; height: 24px; }
+        .cup-size-2 svg { width: 18px; height: 18px; }
+        .cup-size-3 svg { width: 14px; height: 14px; }
+
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(90, 84, 100, 0.2);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            align-items: center; justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-content {
+            background: #fff;
+            width: 100%;
+            max-width: 480px;
+            border-radius: 24px;
+            padding: 24px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(90, 84, 100, 0.15);
+        }
+
+        .drink-section {
+            background: #faf9fb;
+            padding: 16px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #efecf2;
+        }
+
+        .input-field {
+            border: 1px solid var(--lavender-secondary);
+            border-radius: 10px;
+            padding: 10px 12px;
+            width: 100%;
+            font-size: 14px;
+            background: white;
+            margin-top: 4px;
+        }
+
+        .option-btn {
+            padding: 8px 2px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            font-size: 11px;
+            text-align: center;
+            cursor: pointer;
+            background: white;
+            color: #b1abb9;
+            transition: all 0.2s;
+        }
+
+        .option-btn.active {
+            background: var(--lavender-primary);
+            color: white;
+            border-color: var(--lavender-primary);
+        }
+
+        .save-btn {
+            background: var(--lavender-accent);
+            color: white;
+            width: 100%;
+            padding: 16px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 15px;
+            margin-top: 8px;
+        }
+
+        /* 統計數字樣式 */
+        .stat-value {
+            color: var(--stat-value-color);
+        }
+
+        /* 圖表區塊 */
+        .charts-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 30px;
+        }
+
+        .chart-container {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid var(--lavender-grid-line);
+            box-shadow: 0 4px 12px rgba(155, 142, 169, 0.05);
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="max-w-4xl mx-auto">
+        <header class="flex justify-between items-start mb-6 pt-4 px-1">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2" style="color: var(--lavender-text)">
+                    手搖成癮患者 🥤
+                </h1>
+                <p class="text-[12px] font-medium tracking-wide mt-1" style="color: #9b8ea9">「半生清夢，一盞甜茶。」</p>
+            </div>
+            <div class="text-right">
+                <div class="flex flex-col items-end leading-none font-bold text-[11px] text-gray-400 uppercase tracking-tight">
+                    <span id="year-total-info">YEARLY: <span class="stat-value">0</span> CUPS&nbsp;&nbsp;&nbsp;COST: <span class="stat-value">0</span></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 月份滾動選擇 -->
+        <div class="flex overflow-x-auto gap-2 mb-6 pb-2 scrollbar-hide" id="month-nav"></div>
+
+        <!-- 月統計摘要 -->
+        <div class="flex justify-between items-end mb-4 px-2">
+            <div class="flex items-center">
+                <h2 id="current-month-title" class="text-2xl font-bold" style="color: var(--lavender-accent)">一月</h2>
+            </div>
+            <div class="flex gap-4 text-[11px] text-gray-400 font-bold uppercase">
+                <span>Monthly: <b id="month-total-cups" class="stat-value">0</b> CUPS</span>
+                <span>Cost: <b id="month-total-cost" class="stat-value">0</b></span>
+            </div>
+        </div>
+
+        <!-- 日曆網格 -->
+        <div class="calendar-grid" id="calendar-container"></div>
+
+        <!-- 圖表區域 -->
+        <div class="charts-row">
+            <!-- 本月圖表 -->
+            <div class="chart-container">
+                <h3 class="text-sm font-bold mb-4 flex items-center gap-2" style="color: #726a83">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                    飲料店消費佔比 (本月)
+                </h3>
+                <div style="position: relative; height:200px; width:100%">
+                    <canvas id="shopChart"></canvas>
+                </div>
+                <div id="no-data-msg" class="text-center py-10 text-gray-300 text-xs hidden">
+                    尚無本月數據
+                </div>
+            </div>
+
+            <!-- 年度圖表 -->
+            <div class="chart-container">
+                <h3 class="text-sm font-bold mb-4 flex items-center gap-2" style="color: #726a83">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10"></path></svg>
+                    飲料店消費佔比 (年度)
+                </h3>
+                <div style="position: relative; height:200px; width:100%">
+                    <canvas id="yearShopChart"></canvas>
+                </div>
+                <div id="no-year-data-msg" class="text-center py-10 text-gray-300 text-xs hidden">
+                    尚無年度數據
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編輯彈窗 -->
+    <div id="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h3 id="modal-title" class="text-lg font-bold" style="color: var(--lavender-text)">攝取紀錄</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">今天喝了什麼好心情？</p>
+                </div>
+                <button onclick="closeModal(null)" class="text-gray-300 hover:text-gray-500 text-2xl">&times;</button>
+            </div>
+            
+            <div id="drink-forms-container"></div>
+
+            <button onclick="closeModal(null)" class="save-btn">儲存紀錄</button>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'DRINK_JOURNAL_2026_LAVENDER_V1';
+        const months = ["JAN 一月", "FEB 二月", "MAR 三月", "APR 四月", "MAY 五月", "JUN 六月", "JUL 七月", "AUG 八月", "SEP 九月", "OCT 十月", "NOV 十一月", "DEC 十二月"];
+        const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+        const sugarOptions = ["無法", "全糖", "半糖", "微糖", "1分", "無糖"];
+        const iceOptions = ["少冰", "微冰", "去冰", "常溫", "溫"];
+        
+        // 紫色系色盤 (莫蘭迪紫)
+        const lavenderColors = ['#9b8ea9', '#a79ab4', '#b9b2c3', '#8675a9', '#7a6a99', '#c5bbd1', '#dcd6e0', '#6b5e80', '#b1abb9'];
+
+        let currentMonth = new Date().getMonth(); 
+        let activeDay = null;
+        let drinkData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        let shopChart = null;
+        let yearShopChart = null;
+
+        function initData() {
+            if (Object.keys(drinkData).length === 0) {
+                for (let m = 0; m < 12; m++) drinkData[m] = {};
+            }
+        }
+
+        function getCupSvg(color) {
+            return `
+                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M25 20L32 85C32.5 89.5 36.5 93 41 93H59C63.5 93 67.5 89.5 68 85L75 20H25Z" fill="${color}" fill-opacity="0.3" stroke="${color}" stroke-width="4"/>
+                    <path d="M20 20H80V28H20V20Z" fill="${color}"/>
+                    <path d="M60 10L55 20H65L60 10Z" fill="${color}"/>
+                    <rect x="58" y="5" width="4" height="15" rx="1" fill="${color}"/>
+                    <circle cx="40" cy="50" r="3" fill="${color}" fill-opacity="0.6"/>
+                    <circle cx="55" cy="65" r="3" fill="${color}" fill-opacity="0.6"/>
+                    <circle cx="48" cy="75" r="3" fill="${color}" fill-opacity="0.6"/>
+                    <circle cx="62" cy="55" r="3" fill="${color}" fill-opacity="0.6"/>
+                </svg>
+            `;
+        }
+
+        function renderMonthNav() {
+            const nav = document.getElementById('month-nav');
+            nav.innerHTML = '';
+            months.forEach((name, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `month-btn ${idx === currentMonth ? 'active' : ''}`;
+                btn.textContent = name;
+                btn.onclick = () => { currentMonth = idx; renderCalendar(); renderMonthNav(); };
+                nav.appendChild(btn);
+            });
+        }
+
+        function renderCalendar() {
+            const container = document.getElementById('calendar-container');
+            container.innerHTML = '';
+            document.getElementById('current-month-title').textContent = months[currentMonth];
+
+            weekdays.forEach(day => {
+                const d = document.createElement('div');
+                d.className = 'weekday-label';
+                d.textContent = day;
+                container.appendChild(d);
+            });
+
+            const today = new Date();
+            const daysCount = new Date(2026, currentMonth + 1, 0).getDate();
+            const firstDay = new Date(2026, currentMonth, 1).getDay();
+
+            for (let i = 0; i < firstDay; i++) {
+                container.appendChild(document.createElement('div'));
+            }
+
+            for (let d = 1; d <= daysCount; d++) {
+                const cell = document.createElement('div');
+                const isToday = today.getFullYear() === 2026 && today.getMonth() === currentMonth && today.getDate() === d;
+                
+                cell.className = `day-cell ${isToday ? 'is-today' : ''}`;
+                cell.onclick = () => openModal(d);
+                
+                const dayEntries = drinkData[currentMonth][d] || [];
+                const validDrinks = dayEntries.filter(dr => dr.shop || dr.item);
+                const count = validDrinks.length;
+
+                if (count > 0) cell.classList.add('has-data');
+
+                let sizeClass = 'cup-size-1';
+                if (count === 2) sizeClass = 'cup-size-2';
+                else if (count >= 3) sizeClass = 'cup-size-3';
+
+                let iconsHtml = '';
+                for(let k = 0; k < count; k++) {
+                    const color = lavenderColors[k % lavenderColors.length];
+                    iconsHtml += `<span class="cup-svg-wrapper ${sizeClass}">${getCupSvg(color)}</span>`;
+                }
+                
+                cell.innerHTML = `
+                    <div class="day-num">${d.toString().padStart(2, '0')}</div>
+                    <div class="drink-icons-container">${iconsHtml}</div>
+                `;
+                container.appendChild(cell);
+            }
+            calculateStats();
+        }
+
+        function openModal(day) {
+            activeDay = day;
+            document.getElementById('modal-title').textContent = `${months[currentMonth].split(' ')[1]} ${day}日`;
+            document.getElementById('modal-overlay').style.display = 'flex';
+            
+            const container = document.getElementById('drink-forms-container');
+            container.innerHTML = '';
+            
+            if (!drinkData[currentMonth][day]) {
+                drinkData[currentMonth][day] = [
+                    {shop:'', item:'', price:'', sugar:'', ice:''},
+                    {shop:'', item:'', price:'', sugar:'', ice:''},
+                    {shop:'', item:'', price:'', sugar:'', ice:''}
+                ];
+            }
+            
+            const dayEntries = drinkData[currentMonth][day];
+
+            for (let i = 0; i < 3; i++) {
+                const drink = dayEntries[i];
+                const section = document.createElement('div');
+                section.className = 'drink-section';
+                section.innerHTML = `
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <input type="text" class="input-field" placeholder="店名" value="${drink.shop || ''}" oninput="updateDrink(${i}, 'shop', this.value)">
+                        <input type="text" class="input-field" placeholder="品項" value="${drink.item || ''}" oninput="updateDrink(${i}, 'item', this.value)">
+                    </div>
+                    <div class="mb-3">
+                        <input type="number" class="input-field" placeholder="金額" value="${drink.price || ''}" oninput="updateDrink(${i}, 'price', this.value)">
+                    </div>
+                    <div class="grid grid-cols-6 gap-1 mb-2">
+                        ${sugarOptions.map(opt => `<div class="option-btn ${drink.sugar === opt ? 'active' : ''}" onclick="toggleOpt(${i}, 'sugar', '${opt}', this)">${opt}</div>`).join('')}
+                    </div>
+                    <div class="grid grid-cols-5 gap-1">
+                        ${iceOptions.map(opt => `<div class="option-btn ${drink.ice === opt ? 'active' : ''}" onclick="toggleOpt(${i}, 'ice', '${opt}', this)">${opt}</div>`).join('')}
+                    </div>
+                `;
+                container.appendChild(section);
+            }
+        }
+
+        function updateDrink(idx, field, val) {
+            drinkData[currentMonth][activeDay][idx][field] = val;
+            save();
+        }
+
+        function toggleOpt(idx, field, val, el) {
+            const currentVal = drinkData[currentMonth][activeDay][idx][field];
+            const btns = el.parentElement.querySelectorAll('.option-btn');
+            
+            if (currentVal === val) {
+                drinkData[currentMonth][activeDay][idx][field] = '';
+                el.classList.remove('active');
+            } else {
+                btns.forEach(b => b.classList.remove('active'));
+                drinkData[currentMonth][activeDay][idx][field] = val;
+                el.classList.add('active');
+            }
+            save();
+        }
+
+        function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(drinkData)); }
+
+        function calculateStats() {
+            let totalCups = 0, totalCost = 0, mCups = 0, mCost = 0;
+            let shopStats = {};
+            let yearShopStats = {};
+
+            for (let m = 0; m < 12; m++) {
+                for (let d in drinkData[m]) {
+                    drinkData[m][d].forEach(dr => {
+                        if (dr.shop || dr.item) {
+                            const p = parseInt(dr.price) || 0;
+                            totalCups++; totalCost += p;
+                            
+                            const shopLabel = dr.shop || '未命名';
+                            yearShopStats[shopLabel] = (yearShopStats[shopLabel] || 0) + p;
+
+                            if (parseInt(m) === currentMonth) { 
+                                mCups++; mCost += p; 
+                                shopStats[shopLabel] = (shopStats[shopLabel] || 0) + p;
+                            }
+                        }
+                    });
+                }
+            }
+            document.getElementById('month-total-cups').textContent = mCups;
+            document.getElementById('month-total-cost').textContent = mCost;
+            document.getElementById('year-total-info').innerHTML = `YEARLY: <span class="stat-value">${totalCups}</span> CUPS&nbsp;&nbsp;&nbsp;COST: <span class="stat-value">${totalCost.toLocaleString()}</span>`;
+            
+            updateChart('shopChart', shopStats, shopChart, (chart) => shopChart = chart, 'no-data-msg');
+            updateChart('yearShopChart', yearShopStats, yearShopChart, (chart) => yearShopChart = chart, 'no-year-data-msg');
+        }
+
+        function updateChart(canvasId, stats, chartInstance, setChartInstance, noDataId) {
+            const labels = Object.keys(stats);
+            const data = Object.values(stats);
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const noDataMsg = document.getElementById(noDataId);
+
+            if (labels.length === 0) {
+                noDataMsg.classList.remove('hidden');
+                canvas.classList.add('hidden');
+                return;
+            } else {
+                noDataMsg.classList.add('hidden');
+                canvas.classList.remove('hidden');
+            }
+
+            if (chartInstance) {
+                chartInstance.data.labels = labels;
+                chartInstance.data.datasets[0].data = data;
+                chartInstance.update();
+            } else {
+                const newChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: lavenderColors,
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 10,
+                                    font: { size: 10, family: 'Noto Sans TC' }
+                                }
+                            },
+                            tooltip: {
+                                bodyFont: { family: 'Noto Sans TC' },
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed || 0;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = Math.round((value / total) * 100);
+                                        return ` ${label}: $${value} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                setChartInstance(newChart);
+            }
+        }
+
+        function closeModal(e) {
+            if (e && e.target !== document.getElementById('modal-overlay')) return;
+            document.getElementById('modal-overlay').style.display = 'none';
+            renderCalendar();
+        }
+
+        initData();
+        renderMonthNav();
+        renderCalendar();
+    </script>
+</body>
+</html>
+
